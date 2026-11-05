@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0f1117">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <title>한글 Flash — Korean alphabet flashcards</title>
 <link rel="stylesheet" href="style.css">
 </head>
@@ -26,9 +28,12 @@
   <div class="progress" title="cards seen"><i id="progressFill"></i></div>
   <span id="progressText" class="mono">0 / 399</span>
   <span class="spacer"></span>
-  <button id="viewBtn" class="ghost" title="Toggle grid (g)">▦ Grid</button>
-  <button id="romBtn" class="ghost" title="Toggle romanization (s)">가 romanization</button>
-  <button id="shuffleBtn" class="ghost" title="Shuffle (r)">⇄ Shuffle</button>
+  <div class="controls">
+    <button id="viewBtn" class="ghost" title="Toggle grid (g)">▦ Grid</button>
+    <button id="romBtn" class="ghost" title="Toggle romanization (s)"><span class="wide">가 romanization</span><span class="narrow">가 rom</span></button>
+    <button id="shuffleBtn" class="ghost" title="Shuffle (r)">⇄ Shuffle</button>
+    <button id="resetBtn" class="ghost danger" title="Clear all progress">↺ Clear</button>
+  </div>
 </div>
 
 <main id="study">

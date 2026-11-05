@@ -10,7 +10,7 @@
     verdictGood: $('verdictGood'), verdictBad: $('verdictBad'),
     progressFill: $('progressFill'), progressText: $('progressText'),
     grid: $('grid'), study: $('study'), footInfo: $('footInfo'), scoreInfo: $('scoreInfo'),
-    viewBtn: $('viewBtn'), romBtn: $('romBtn'), shuffleBtn: $('shuffleBtn'),
+    viewBtn: $('viewBtn'), romBtn: $('romBtn'), shuffleBtn: $('shuffleBtn'), resetBtn: $('resetBtn'),
   };
 
   const LS = 'hangul-flash-v1';
@@ -279,6 +279,22 @@
     state.showRom = !state.showRom;
     el.romBtn.classList.toggle('on', state.showRom);
     persist();
+    render();
+  });
+
+  el.resetBtn.addEventListener('click', () => {
+    const ok = window.confirm(
+      'Clear all progress?\n\nThis forgets every card you have seen and every good/bad rating, for both decks. It cannot be undone.'
+    );
+    if (!ok) return;
+    state.seen.clear();
+    state.ratings = {};
+    try { localStorage.removeItem(LS); } catch {}
+    persist();                                     // write the cleared state back
+    el.grid.querySelectorAll('.tile').forEach(t => t.classList.remove('seen', 'good', 'bad'));
+    el.card.classList.remove('good', 'bad');
+    updateProgress();
+    updateScore();
     render();
   });
 
