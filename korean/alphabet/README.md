@@ -38,6 +38,8 @@ style.css       dark card UI, mobile-first
 app.js          deck logic, audio playback, keyboard, progress
 data.js         generated: 399 syllables + 40 jamo with romanizations
 audio/          439 MP3s — sNNN.mp3 (syllable) and jNN.mp3 (jamo)
+font/           hangul-flash.woff2 — 61 KB subset font, so Hangul renders even on a
+                machine with no Korean system font
 build_deck.py   regenerates data.js + audio/
 ```
 

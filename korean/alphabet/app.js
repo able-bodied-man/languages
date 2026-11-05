@@ -54,9 +54,16 @@
     markSeen(card);
     flashPlaying(card);
     const src = 'audio/' + card.k + '.mp3';
-    if (player.getAttribute('src') !== src) player.setAttribute('src', src);
+    if (!player.src.endsWith('/' + src)) player.src = src;
+    else player.currentTime = 0;
     const p = player.play();
-    if (p && p.catch) p.catch(() => speakFallback(deckIsJamo() ? card.name : card.ch));
+    if (p && p.catch) {
+      p.catch((err) => {
+        // AbortError = a newer card interrupted this one; not a failure
+        if (err && err.name === 'AbortError') return;
+        speakFallback(deckIsJamo() ? card.name : card.ch);
+      });
+    }
   }
 
   let flashTimer = null;

@@ -1,3 +1,9 @@
+@font-face{
+  font-family:"Hangul Flash";
+  src:url("font/hangul-flash.woff2") format("woff2");
+  font-weight:100 900;
+  font-display:swap;
+}
 :root{
   --bg:#0f1117; --panel:#171a23; --panel2:#1e222d; --line:#2a2f3d;
   --ink:#eef1f7; --dim:#98a0b3; --accent:#7c9cff; --accent2:#5ee2b0;
@@ -8,7 +14,7 @@ html,body{margin:0;height:100%}
 body{
   background:radial-gradient(1200px 600px at 50% -10%, #1b2130 0%, var(--bg) 60%) fixed;
   color:var(--ink);
-  font:16px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans KR",sans-serif;
+  font:16px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Hangul Flash","Noto Sans KR","Malgun Gothic","Apple SD Gothic Neo","NanumGothic","Droid Sans Fallback",sans-serif;
   display:flex;flex-direction:column;min-height:100%;
   -webkit-tap-highlight-color:transparent;
 }
