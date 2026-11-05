@@ -1,0 +1,140 @@
+#!/usr/bin/env python3
+"""Build the Korean alphabet flashcard deck: data.js + one MP3 per card.
+
+399 modern Hangul CV syllables (19 initial consonants x 21 vowels), plus the
+40 jamo (19 consonants + 21 vowels) as a second deck.
+
+Audio: edge-tts (ko-KR-SunHiNeural) -> audio/sNNN.mp3 and audio/jNN.mp3.
+Re-runnable: existing MP3s are skipped unless --force.
+"""
+import argparse
+import asyncio
+import json
+import os
+import sys
+
+OUT = os.path.dirname(os.path.abspath(__file__))
+
+INITIALS = [
+    ("ㄱ", "g"), ("ㄲ", "kk"), ("ㄴ", "n"), ("ㄷ", "d"), ("ㄸ", "tt"),
+    ("ㄹ", "r"), ("ㅁ", "m"), ("ㅂ", "b"), ("ㅃ", "pp"), ("ㅅ", "s"),
+    ("ㅆ", "ss"), ("ㅇ", ""), ("ㅈ", "j"), ("ㅉ", "jj"), ("ㅊ", "ch"),
+    ("ㅋ", "k"), ("ㅌ", "t"), ("ㅍ", "p"), ("ㅎ", "h"),
+]
+VOWELS = [
+    ("ㅏ", "a"), ("ㅐ", "ae"), ("ㅑ", "ya"), ("ㅒ", "yae"), ("ㅓ", "eo"),
+    ("ㅔ", "e"), ("ㅕ", "yeo"), ("ㅖ", "ye"), ("ㅗ", "o"), ("ㅘ", "wa"),
+    ("ㅙ", "wae"), ("ㅚ", "oe"), ("ㅛ", "yo"), ("ㅜ", "u"), ("ㅝ", "wo"),
+    ("ㅞ", "we"), ("ㅟ", "wi"), ("ㅠ", "yu"), ("ㅡ", "eu"), ("ㅢ", "ui"),
+    ("ㅣ", "i"),
+]
+# letter names, spoken for the jamo deck
+JAMO_NAMES = {
+    "ㄱ": ("기역", "giyeok"), "ㄲ": ("쌍기역", "ssanggiyeok"), "ㄴ": ("니은", "nieun"),
+    "ㄷ": ("디귿", "digeut"), "ㄸ": ("쌍디귿", "ssangdigeut"), "ㄹ": ("리을", "rieul"),
+    "ㅁ": ("미음", "mieum"), "ㅂ": ("비읍", "bieup"), "ㅃ": ("쌍비읍", "ssangbieup"),
+    "ㅅ": ("시옷", "siot"), "ㅆ": ("쌍시옷", "ssangsiot"), "ㅇ": ("이응", "ieung"),
+    "ㅈ": ("지읒", "jieut"), "ㅉ": ("쌍지읒", "ssangjieut"), "ㅊ": ("치읓", "chieut"),
+    "ㅋ": ("키읔", "kieuk"), "ㅌ": ("티읕", "tieut"), "ㅍ": ("피읖", "pieup"),
+    "ㅎ": ("히읗", "hieut"), "ㅏ": ("아", "a"), "ㅐ": ("애", "ae"), "ㅑ": ("야", "ya"),
+    "ㅒ": ("얘", "yae"), "ㅓ": ("어", "eo"), "ㅔ": ("에", "e"), "ㅕ": ("여", "yeo"),
+    "ㅖ": ("예", "ye"), "ㅗ": ("오", "o"), "ㅘ": ("와", "wa"), "ㅙ": ("왜", "wae"),
+    "ㅚ": ("외", "oe"), "ㅛ": ("요", "yo"), "ㅜ": ("우", "u"), "ㅝ": ("워", "wo"),
+    "ㅞ": ("웨", "we"), "ㅟ": ("위", "wi"), "ㅠ": ("유", "yu"), "ㅡ": ("으", "eu"),
+    "ㅢ": ("의", "ui"), "ㅣ": ("이", "i"),
+}
+
+
+def syllable(li: int, vi: int) -> str:
+    return chr(0xAC00 + (li * 21 + vi) * 28)
+
+
+def build_data():
+    syllables = []
+    for li, (ini, init_rom) in enumerate(INITIALS):
+        for vi, (vow, vow_rom) in enumerate(VOWELS):
+            syllables.append({
+                "k": "s%03d" % len(syllables),
+                "ch": syllable(li, vi),
+                "rom": init_rom + vow_rom,
+                "ini": ini,
+                "vow": vow,
+                "group": li,
+            })
+    jamo = []
+    for i, (ch, rom) in enumerate(INITIALS + VOWELS):
+        name, name_rom = JAMO_NAMES[ch]
+        jamo.append({
+            "k": "j%02d" % i,
+            "ch": ch,
+            "rom": rom,
+            "name": name,
+            "nameRom": name_rom,
+            "kind": "consonant" if i < len(INITIALS) else "vowel",
+        })
+    return {
+        "meta": {
+            "syllableCount": len(syllables),
+            "jamoCount": len(jamo),
+            "voice": "ko-KR-SunHiNeural",
+            "initials": len(INITIALS),
+            "vowels": len(VOWELS),
+        },
+        "groups": [{"ini": ini, "rom": rom} for ini, rom in INITIALS],
+        "vowels": [{"vow": v, "rom": r} for v, r in VOWELS],
+        "syllables": syllables,
+        "jamo": jamo,
+    }
+
+
+async def synth(edge_tts, text, path, voice, sem, force):
+    if os.path.exists(path) and os.path.getsize(path) > 500 and not force:
+        return "skip"
+    async with sem:
+        for attempt in range(4):
+            try:
+                await edge_tts.Communicate(text, voice=voice).save(path)
+                if os.path.getsize(path) > 500:
+                    return "ok"
+            except Exception:
+                pass
+            await asyncio.sleep(1.5 * (attempt + 1))
+    return "fail"
+
+
+async def main_async(data, voice, force, workers):
+    import edge_tts
+    audio = os.path.join(OUT, "audio")
+    os.makedirs(audio, exist_ok=True)
+    sem = asyncio.Semaphore(workers)
+    jobs = [(s["ch"], os.path.join(audio, s["k"] + ".mp3")) for s in data["syllables"]]
+    jobs += [(j["name"], os.path.join(audio, j["k"] + ".mp3")) for j in data["jamo"]]
+    results = await asyncio.gather(*[synth(edge_tts, t, p, voice, sem, force) for t, p in jobs])
+    ok = results.count("ok"); skip = results.count("skip"); fail = [jobs[i] for i, r in enumerate(results) if r == "fail"]
+    print("audio: ok=%d skip=%d fail=%d" % (ok, skip, len(fail)))
+    for t, p in fail[:10]:
+        print("  FAILED", t, os.path.basename(p))
+    return len(fail)
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--voice", default="ko-KR-SunHiNeural")
+    ap.add_argument("--force", action="store_true")
+    ap.add_argument("--workers", type=int, default=4)
+    ap.add_argument("--no-audio", action="store_true")
+    a = ap.parse_args()
+
+    data = build_data()
+    with open(os.path.join(OUT, "data.js"), "w", encoding="utf-8") as f:
+        f.write("// generated by build_deck.py - do not edit by hand\nwindow.DECK = ")
+        json.dump(data, f, ensure_ascii=False, separators=(",", ":"))
+        f.write(";\n")
+    print("data.js: %d syllables, %d jamo" % (len(data["syllables"]), len(data["jamo"])))
+    if a.no_audio:
+        return 0
+    return 1 if asyncio.run(main_async(data, a.voice, a.force, a.workers)) else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
