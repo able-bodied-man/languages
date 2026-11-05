@@ -13,7 +13,7 @@
     <span class="logo">한</span>
     <div>
       <h1>한글 Flash</h1>
-      <p class="sub">Korean alphabet flashcards · click a card to hear it</p>
+      <p class="sub">tap to hear · swipe right = good, left = bad</p>
     </div>
   </div>
   <div class="deck-switch" role="tablist" aria-label="Deck">
@@ -27,30 +27,20 @@
   <span id="progressText" class="mono">0 / 399</span>
   <span class="spacer"></span>
   <button id="viewBtn" class="ghost" title="Toggle grid (g)">▦ Grid</button>
-  <button id="romBtn" class="ghost on" title="Toggle romanization (s)">가 romanization</button>
+  <button id="romBtn" class="ghost" title="Toggle romanization (s)">가 romanization</button>
   <button id="shuffleBtn" class="ghost" title="Shuffle (r)">⇄ Shuffle</button>
 </div>
 
 <main id="study">
   <div class="cardwrap">
-    <button id="card" class="card" aria-label="Play pronunciation">
+    <button id="card" class="card" aria-label="Tap to hear the pronunciation; swipe right for good, left for bad">
+      <span class="verdict good" id="verdictGood">알아요 · good</span>
+      <span class="verdict bad" id="verdictBad">몰라요 · bad</span>
       <span class="glyph" id="glyph">가</span>
       <span class="rom" id="rom">ga</span>
-      <span class="hint" id="cardHint">click to play</span>
+      <span class="hint" id="cardHint">tap to hear · swipe to grade</span>
     </button>
   </div>
-
-  <div class="meta">
-    <div class="chips" id="chips" aria-label="Filter by initial consonant"></div>
-  </div>
-
-  <div class="controls">
-    <button id="prevBtn" class="ctrl" title="Previous (←)">←</button>
-    <button id="playBtn" class="ctrl primary" title="Play (space)">▶ Play</button>
-    <button id="nextBtn" class="ctrl" title="Next (→)">→</button>
-    <span class="counter mono" id="counter">1 / 399</span>
-  </div>
-  <p class="kbdHint mono">space play · ← → move · r shuffle · g grid · s romanization</p>
 </main>
 
 <section id="grid" class="grid hidden" aria-label="All cards"></section>
@@ -58,7 +48,7 @@
 <footer class="foot">
   <span id="footInfo" class="mono"></span>
   <span class="spacer"></span>
-  <span class="mono">voice: ko-KR · offline audio</span>
+  <span id="scoreInfo" class="mono"></span>
 </footer>
 
 <script src="data.js"></script>

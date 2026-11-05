@@ -24,11 +24,12 @@ python3 -m http.server 8765   # then open http://127.0.0.1:8765/
 
 **Controls**
 
-- **Click the card** (or press `space`) — plays the pronunciation and marks it seen
-- `←` `→` — previous / next card · `r` — shuffle · `g` — grid of all cards
-- `s` — show/hide romanization (quiz yourself) · `▦ Grid` — click any tile to hear it
-- Filter chips — restrict to one initial consonant (syllable deck) or consonants/vowels (jamo deck)
-- Progress ("seen" count) is saved in `localStorage` per browser
+- **Tap the card** — plays the pronunciation and marks it seen
+- **Swipe right = good (알아요) · swipe left = bad (몰라요)** — grades the card, then flies it out and deals the next one
+- `space` — replay · `←` `→` — previous / next · `h` / `l` — grade bad / good
+- `r` — shuffle · `g` — grid of all cards (tiles keep their ✓/✗) · `s` — show/hide romanization
+- Starts **shuffled, romanization hidden**. Seen count and good/bad grades are saved in
+  `localStorage` per browser (footer shows the running ✓/✗ tally).
 
 ## Files
 

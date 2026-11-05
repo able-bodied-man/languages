@@ -1,4 +1,5 @@
-/* Korean alphabet flashcards — vanilla JS, no build step. */
+/* Korean alphabet flashcards — vanilla JS, no build step.
+   Card: tap = play pronunciation, swipe right = good, swipe left = bad. */
 (() => {
   const D = window.DECK;
   if (!D) { document.body.innerHTML = '<p style="padding:24px">data.js missing — run build_deck.py</p>'; return; }
@@ -6,10 +7,10 @@
   const $ = (id) => document.getElementById(id);
   const el = {
     card: $('card'), glyph: $('glyph'), rom: $('rom'), hint: $('cardHint'),
-    counter: $('counter'), chips: $('chips'), progressFill: $('progressFill'),
-    progressText: $('progressText'), grid: $('grid'), study: $('study'),
-    footInfo: $('footInfo'), viewBtn: $('viewBtn'), romBtn: $('romBtn'), shuffleBtn: $('shuffleBtn'),
-    prevBtn: $('prevBtn'), playBtn: $('playBtn'), nextBtn: $('nextBtn'),
+    verdictGood: $('verdictGood'), verdictBad: $('verdictBad'),
+    progressFill: $('progressFill'), progressText: $('progressText'),
+    grid: $('grid'), study: $('study'), footInfo: $('footInfo'), scoreInfo: $('scoreInfo'),
+    viewBtn: $('viewBtn'), romBtn: $('romBtn'), shuffleBtn: $('shuffleBtn'),
   };
 
   const LS = 'hangul-flash-v1';
@@ -18,26 +19,30 @@
 
   const state = {
     deck: saved.deck === 'jamo' ? 'jamo' : 'syllables',
-    filter: 'all',
     order: [],
     pos: 0,
-    showRom: saved.showRom !== false,
+    // defaults: romanization hidden, order shuffled
+    showRom: saved.showRom === true,
     view: 'card',
     seen: new Set(Array.isArray(saved.seen) ? saved.seen : []),
+    ratings: (saved.ratings && typeof saved.ratings === 'object') ? saved.ratings : {},
   };
 
   const persist = () => {
-    try { localStorage.setItem(LS, JSON.stringify({ deck: state.deck, showRom: state.showRom, seen: [...state.seen] })); } catch {}
+    try {
+      localStorage.setItem(LS, JSON.stringify({
+        deck: state.deck, showRom: state.showRom, seen: [...state.seen], ratings: state.ratings,
+      }));
+    } catch {}
   };
 
   const cardsFor = (deck) => deck === 'jamo' ? D.jamo : D.syllables;
-  const labelFor = (card) => deckIsJamo() ? card.name : card.rom;
   const deckIsJamo = () => state.deck === 'jamo';
+  const idOf = (card) => state.deck + ':' + card.k;
 
   /* ---------- audio ---------- */
   const player = new Audio();
   player.preload = 'auto';
-  let playingKey = null;
 
   function speakFallback(text) {
     if (!('speechSynthesis' in window)) return;
@@ -50,7 +55,6 @@
 
   function play(card) {
     if (!card) return;
-    playingKey = card.k;
     markSeen(card);
     flashPlaying(card);
     const src = 'audio/' + card.k + '.mp3';
@@ -59,8 +63,7 @@
     const p = player.play();
     if (p && p.catch) {
       p.catch((err) => {
-        // AbortError = a newer card interrupted this one; not a failure
-        if (err && err.name === 'AbortError') return;
+        if (err && err.name === 'AbortError') return;   // a newer card interrupted this one
         speakFallback(deckIsJamo() ? card.name : card.ch);
       });
     }
@@ -81,14 +84,9 @@
     }, 900);
   }
 
-  /* ---------- ordering / filtering ---------- */
+  /* ---------- order ---------- */
   function buildOrder() {
-    let list = cardsFor(state.deck).slice();
-    if (state.filter !== 'all') {
-      if (deckIsJamo()) list = list.filter(c => (state.filter === 'consonant' ? c.kind === 'consonant' : c.kind === 'vowel'));
-      else list = list.filter(c => c.group === state.filter);
-    }
-    state.order = list;
+    state.order = cardsFor(state.deck).slice();
     state.pos = 0;
   }
 
@@ -100,25 +98,40 @@
     state.pos = 0;
   }
 
-  /* ---------- seen / progress ---------- */
+  function step(delta) {
+    if (!state.order.length) return;
+    state.pos = (state.pos + delta + state.order.length) % state.order.length;
+    render();
+  }
+
+  /* ---------- progress / score ---------- */
   function markSeen(card) {
-    const id = state.deck + ':' + card.k;
-    if (!state.seen.has(id)) { state.seen.add(id); persist(); updateProgress(); }
+    const id = idOf(card);
+    if (!state.seen.has(id)) { state.seen.add(id); persist(); updateProgress(); updateScore(); }
     const tile = el.grid.querySelector('[data-key="' + card.k + '"]');
     if (tile) tile.classList.add('seen');
-    el.glyph.classList.add('seen-once');
   }
 
   function updateProgress() {
     const all = cardsFor(state.deck);
-    const n = all.filter(c => state.seen.has(state.deck + ':' + c.k)).length;
-    const pct = all.length ? (n / all.length) * 100 : 0;
-    el.progressFill.style.width = pct.toFixed(1) + '%';
+    const n = all.filter(c => state.seen.has(idOf(c))).length;
+    el.progressFill.style.width = (all.length ? (n / all.length) * 100 : 0).toFixed(1) + '%';
     el.progressText.textContent = n + ' / ' + all.length + ' seen';
   }
 
+  function updateScore() {
+    const all = cardsFor(state.deck);
+    let good = 0, bad = 0;
+    for (const c of all) {
+      const r = state.ratings[idOf(c)];
+      if (r === 'good') good++;
+      else if (r === 'bad') bad++;
+    }
+    el.scoreInfo.textContent = '✓ ' + good + '  ✗ ' + bad;
+  }
+
   /* ---------- rendering ---------- */
-  function currentCard() { return state.order[state.pos]; }
+  const currentCard = () => state.order[state.pos];
 
   function render() {
     const card = currentCard();
@@ -129,36 +142,21 @@
       : card.rom + (card.ini && card.vow ? '  ·  ' + card.ini + ' + ' + card.vow : '');
     el.rom.classList.toggle('show', state.showRom);
     el.card.classList.toggle('no-rom', !state.showRom);
-    el.counter.textContent = (state.pos + 1) + ' / ' + state.order.length;
-    el.hint.textContent = state.showRom ? 'click to play' : 'click to play · romanization hidden';
     el.footInfo.textContent = deckIsJamo()
       ? '자모 ' + D.meta.jamoCount + ' · 자음 19 + 모음 21'
       : '음절 ' + D.meta.syllableCount + ' · 19 initials × 21 vowels';
+    updateScore();
     if (state.view === 'grid') renderGrid();
   }
 
-  function renderChips() {
-    const chips = [];
-    chips.push('<button class="chip' + (state.filter === 'all' ? ' on' : '') + '" data-f="all">All ' + cardsFor(state.deck).length + '</button>');
-    if (deckIsJamo()) {
-      chips.push('<button class="chip' + (state.filter === 'consonant' ? ' on' : '') + '" data-f="consonant">자음 consonants</button>');
-      chips.push('<button class="chip' + (state.filter === 'vowel' ? ' on' : '') + '" data-f="vowel">모음 vowels</button>');
-    } else {
-      D.groups.forEach((g, i) => {
-        chips.push('<button class="chip' + (state.filter === i ? ' on' : '') + '" data-f="' + i + '">' + g.ini + '</button>');
-      });
-    }
-    el.chips.innerHTML = chips.join('');
-  }
-
   function renderGrid() {
-    const html = state.order.map(c => {
-      const seen = state.seen.has(state.deck + ':' + c.k);
-      const sub = deckIsJamo() ? c.rom : c.rom;
-      return '<button class="tile' + (seen ? ' seen' : '') + '" data-key="' + c.k + '">' + c.ch +
-        '<small>' + sub + '</small></button>';
+    el.grid.innerHTML = state.order.map(c => {
+      const seen = state.seen.has(idOf(c));
+      const r = state.ratings[idOf(c)];
+      const cls = 'tile' + (seen ? ' seen' : '') + (r === 'good' ? ' good' : r === 'bad' ? ' bad' : '');
+      return '<button class="' + cls + '" data-key="' + c.k + '">' + c.ch +
+        '<small>' + c.rom + '</small></button>';
     }).join('');
-    el.grid.innerHTML = html;
   }
 
   function setView(v) {
@@ -170,38 +168,106 @@
     if (grid) renderGrid();
   }
 
-  /* ---------- navigation ---------- */
-  function step(delta) {
-    if (!state.order.length) return;
-    state.pos = (state.pos + delta + state.order.length) % state.order.length;
-    render();
+  /* ---------- swipe gestures ---------- */
+  const THRESHOLD = 88;      // px of horizontal travel that grades the card
+  let drag = null;
+  let suppressClick = false;
+
+  function applyDrag(dx) {
+    const rot = Math.max(-16, Math.min(16, dx / 24));
+    el.card.style.transform = 'translateX(' + dx + 'px) rotate(' + rot + 'deg)';
+    el.card.style.opacity = String(1 - Math.min(1, Math.abs(dx) / 700) * 0.35);
+    el.verdictGood.style.opacity = dx > 0 ? String(Math.min(1, dx / THRESHOLD)) : '0';
+    el.verdictBad.style.opacity = dx < 0 ? String(Math.min(1, -dx / THRESHOLD)) : '0';
   }
 
-  /* ---------- events ---------- */
-  el.card.addEventListener('click', () => play(currentCard()));
-  el.playBtn.addEventListener('click', () => play(currentCard()));
-  el.nextBtn.addEventListener('click', () => step(1));
-  el.prevBtn.addEventListener('click', () => step(-1));
+  function resetDrag() {
+    el.card.style.transform = '';
+    el.card.style.opacity = '';
+    el.card.style.transition = '';
+    el.verdictGood.style.opacity = '0';
+    el.verdictBad.style.opacity = '0';
+    el.card.classList.remove('good', 'bad');
+  }
 
-  el.chips.addEventListener('click', (e) => {
-    const b = e.target.closest('.chip');
-    if (!b) return;
-    const f = b.dataset.f;
-    state.filter = f === 'all' ? 'all' : (f === 'consonant' || f === 'vowel') ? f : Number(f);
-    renderChips();
-    buildOrder();
-    render();
+  function rate(card, verdict) {
+    if (!card) return;
+    state.ratings[idOf(card)] = verdict;
+    state.seen.add(idOf(card));
+    persist();
+    updateProgress();
+    updateScore();
+    const tile = el.grid.querySelector('[data-key="' + card.k + '"]');
+    if (tile) tile.classList.add(verdict);
+
+    const dir = verdict === 'good' ? 1 : -1;
+    el.card.classList.add(verdict);
+    el.card.style.transition = 'transform .24s cubic-bezier(.3,0,.6,1), opacity .24s';
+    el.card.style.transform = 'translateX(' + dir * 140 + '%) rotate(' + dir * 14 + 'deg)';
+    el.card.style.opacity = '0';
+    setTimeout(() => {
+      el.card.classList.remove('good', 'bad');
+      el.card.style.transition = 'none';
+      el.card.style.transform = '';
+      el.card.style.opacity = '';
+      step(1);
+      resetDrag();
+      void el.card.offsetWidth;      // commit the reset before transitions resume
+      el.card.style.transition = '';
+    }, 250);
+  }
+
+  el.card.addEventListener('pointerdown', (e) => {
+    if (state.view !== 'card') return;
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    drag = { id: e.pointerId, x0: e.clientX, y0: e.clientY, dx: 0, moved: false };
+    suppressClick = false;
+    el.card.style.transition = 'none';
+    try { el.card.setPointerCapture(e.pointerId); } catch {}
   });
 
+  el.card.addEventListener('pointermove', (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const dx = e.clientX - drag.x0;
+    const dy = e.clientY - drag.y0;
+    if (!drag.moved && Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(dy)) drag.moved = true;
+    if (!drag.moved) return;
+    drag.dx = dx;
+    applyDrag(dx);
+  });
+
+  function endDrag(e) {
+    if (!drag || (e && e.pointerId !== drag.id)) return;
+    const { dx, moved } = drag;
+    drag = null;
+    if (moved) {
+      suppressClick = true;
+      el.card.style.transition = '';
+      if (Math.abs(dx) > THRESHOLD) rate(currentCard(), dx > 0 ? 'good' : 'bad');
+      else resetDrag();
+    } else {
+      el.card.style.transition = '';
+      resetDrag();
+    }
+  }
+
+  el.card.addEventListener('pointerup', endDrag);
+  el.card.addEventListener('pointercancel', endDrag);
+
+  el.card.addEventListener('click', () => {
+    if (suppressClick) { suppressClick = false; return; }
+    play(currentCard());
+  });
+
+  /* ---------- UI wiring ---------- */
   document.querySelectorAll('.deck-switch button').forEach(btn => {
     btn.addEventListener('click', () => {
       if (btn.dataset.deck === state.deck) return;
       state.deck = btn.dataset.deck;
-      state.filter = 'all';
       document.querySelectorAll('.deck-switch button').forEach(b => b.classList.toggle('on', b === btn));
       persist();
-      renderChips();
       buildOrder();
+      shuffleOrder();          // shuffled by default
       updateProgress();
       render();
     });
@@ -230,6 +296,8 @@
       case ' ': case 'Enter': e.preventDefault(); play(currentCard()); break;
       case 'ArrowRight': e.preventDefault(); step(1); break;
       case 'ArrowLeft': e.preventDefault(); step(-1); break;
+      case 'l': case 'L': rate(currentCard(), 'good'); break;
+      case 'h': case 'H': rate(currentCard(), 'bad'); break;
       case 'r': case 'R': shuffleOrder(); render(); break;
       case 'g': case 'G': setView(state.view === 'grid' ? 'card' : 'grid'); break;
       case 's': case 'S': el.romBtn.click(); break;
@@ -239,10 +307,12 @@
   /* ---------- boot ---------- */
   document.querySelectorAll('.deck-switch button').forEach(b => b.classList.toggle('on', b.dataset.deck === state.deck));
   el.romBtn.classList.toggle('on', state.showRom);
-  renderChips();
   buildOrder();
+  shuffleOrder();            // default: shuffled
   updateProgress();
   render();
-  // warm the first few audio files
-  ['audio/' + state.order[0].k + '.mp3'].forEach(src => { const a = new Audio(); a.preload = 'auto'; a.src = src; });
+  resetDrag();
+  const warm = new Audio();
+  warm.preload = 'auto';
+  warm.src = 'audio/' + state.order[0].k + '.mp3';
 })();
