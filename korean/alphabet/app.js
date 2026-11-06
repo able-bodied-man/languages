@@ -10,7 +10,8 @@
     verdictGood: $('verdictGood'), verdictBad: $('verdictBad'),
     progressFill: $('progressFill'), progressText: $('progressText'),
     grid: $('grid'), study: $('study'), footInfo: $('footInfo'), scoreInfo: $('scoreInfo'),
-    viewBtn: $('viewBtn'), romBtn: $('romBtn'), shuffleBtn: $('shuffleBtn'), resetBtn: $('resetBtn'),
+    viewBtn: $('viewBtn'), romBtn: $('romBtn'), shuffleBtn: $('shuffleBtn'),
+    orderBtn: $('orderBtn'), resetBtn: $('resetBtn'),
   };
 
   const LS = 'hangul-flash-v1';
@@ -23,6 +24,7 @@
     pos: 0,
     // defaults: romanization hidden, order shuffled
     showRom: saved.showRom === true,
+    orderMode: saved.orderMode === 'original' ? 'original' : 'shuffle',
     view: 'card',
     seen: new Set(Array.isArray(saved.seen) ? saved.seen : []),
     ratings: (saved.ratings && typeof saved.ratings === 'object') ? saved.ratings : {},
@@ -31,7 +33,8 @@
   const persist = () => {
     try {
       localStorage.setItem(LS, JSON.stringify({
-        deck: state.deck, showRom: state.showRom, seen: [...state.seen], ratings: state.ratings,
+        deck: state.deck, showRom: state.showRom, orderMode: state.orderMode,
+        seen: [...state.seen], ratings: state.ratings,
       }));
     } catch {}
   };
@@ -96,6 +99,18 @@
       [state.order[i], state.order[j]] = [state.order[j], state.order[i]];
     }
     state.pos = 0;
+  }
+
+  /* 'original' = the deck's own order: syllables in 가나다 (Unicode) order,
+     jamo as ㄱㄲㄴ… then ㅏㅐㅑ… ; 'shuffle' = random. */
+  function setOrder(mode) {
+    state.orderMode = mode === 'original' ? 'original' : 'shuffle';
+    buildOrder();
+    if (state.orderMode === 'shuffle') shuffleOrder();
+    el.shuffleBtn.classList.toggle('on', state.orderMode === 'shuffle');
+    el.orderBtn.classList.toggle('on', state.orderMode === 'original');
+    persist();
+    render();
   }
 
   function step(delta) {
@@ -265,15 +280,13 @@
       if (btn.dataset.deck === state.deck) return;
       state.deck = btn.dataset.deck;
       document.querySelectorAll('.deck-switch button').forEach(b => b.classList.toggle('on', b === btn));
-      persist();
-      buildOrder();
-      shuffleOrder();          // shuffled by default
       updateProgress();
-      render();
+      setOrder(state.orderMode);   // keep whatever order the user picked
     });
   });
 
-  el.shuffleBtn.addEventListener('click', () => { shuffleOrder(); render(); });
+  el.shuffleBtn.addEventListener('click', () => setOrder('shuffle'));
+  el.orderBtn.addEventListener('click', () => setOrder('original'));
   el.viewBtn.addEventListener('click', () => setView(state.view === 'grid' ? 'card' : 'grid'));
   el.romBtn.addEventListener('click', () => {
     state.showRom = !state.showRom;
@@ -314,7 +327,8 @@
       case 'ArrowLeft': e.preventDefault(); step(-1); break;
       case 'l': case 'L': rate(currentCard(), 'good'); break;
       case 'h': case 'H': rate(currentCard(), 'bad'); break;
-      case 'r': case 'R': shuffleOrder(); render(); break;
+      case 'r': case 'R': setOrder('shuffle'); break;
+      case 'o': case 'O': setOrder('original'); break;
       case 'g': case 'G': setView(state.view === 'grid' ? 'card' : 'grid'); break;
       case 's': case 'S': el.romBtn.click(); break;
     }
@@ -323,10 +337,8 @@
   /* ---------- boot ---------- */
   document.querySelectorAll('.deck-switch button').forEach(b => b.classList.toggle('on', b.dataset.deck === state.deck));
   el.romBtn.classList.toggle('on', state.showRom);
-  buildOrder();
-  shuffleOrder();            // default: shuffled
+  setOrder(state.orderMode);        // default: shuffled
   updateProgress();
-  render();
   resetDrag();
   const warm = new Audio();
   warm.preload = 'auto';
