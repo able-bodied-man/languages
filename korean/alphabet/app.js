@@ -88,8 +88,27 @@
   }
 
   /* ---------- order ---------- */
+  /* 'original' = teaching order. Syllables run group by group (ㄱ, ㄲ, ㄴ …) and
+     inside a group the ten plain vowels come first (ㅏ ㅑ ㅓ ㅕ ㅗ ㅛ ㅜ ㅠ ㅡ ㅣ),
+     then the derived ones (ㅐ ㅒ ㅔ ㅖ ㅘ ㅙ ㅚ ㅝ ㅞ ㅟ ㅢ) — 가 갸 거 겨 고 교 구 규 그 기 개 걔 게 계 …
+     Jamo keep the alphabet's own order: ㄱㄲㄴㄷ… then ㅏㅐㅑ… */
+  const vowelRank = {};
+  ((D.meta && D.meta.vowelOrder) || []).forEach((v, i) => { vowelRank[v] = i; });
+  const vRank = (c) => (vowelRank[c.vow] != null ? vowelRank[c.vow] : 99);
+
+  const orderedCache = {};
+  function orderedCards() {
+    let list = orderedCache[state.deck];
+    if (!list) {
+      list = cardsFor(state.deck).slice();
+      if (!deckIsJamo()) list.sort((a, b) => (a.group - b.group) || (vRank(a) - vRank(b)));
+      orderedCache[state.deck] = list;
+    }
+    return list.slice();
+  }
+
   function buildOrder() {
-    state.order = cardsFor(state.deck).slice();
+    state.order = orderedCards();
     state.pos = 0;
   }
 
@@ -101,8 +120,6 @@
     state.pos = 0;
   }
 
-  /* 'original' = the deck's own order: syllables in 가나다 (Unicode) order,
-     jamo as ㄱㄲㄴ… then ㅏㅐㅑ… ; 'shuffle' = random. */
   function setOrder(mode) {
     state.orderMode = mode === 'original' ? 'original' : 'shuffle';
     buildOrder();

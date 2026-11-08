@@ -26,8 +26,10 @@ python3 -m http.server 8765   # then open http://127.0.0.1:8765/
 
 - **Tap the card** — plays the pronunciation and marks it seen
 - **Swipe right = good (알아요) · swipe left = bad (몰라요)** — grades the card, then flies it out and deals the next one
-- **⇄ Shuffle / 가나다 Original** — shuffle the deck, or put it back in Korean order
-  (syllables → 가나다, jamo → ㄱㄲㄴㄷ… then ㅏㅐㅑ…). The choice sticks across reloads.
+- **⇄ Shuffle / Original** — shuffle the deck, or put it back in teaching order: group by
+  initial consonant (ㄱ, ㄲ, ㄴ, ㄷ …) and inside each group the plain vowels first
+  (가 갸 거 겨 고 교 구 규 그 기), then the compound ones (개 걔 게 계 과 괘 괴 궈 궤 귀 긔).
+  The choice sticks across reloads.
 - `space` — replay · `←` `→` — previous / next · `h` / `l` — grade bad / good
 - `r` — shuffle · `o` — original order · `g` — grid of all cards (tiles keep their ✓/✗) · `s` — show/hide romanization
 - Starts **shuffled, romanization hidden**. Seen count and good/bad grades are saved in

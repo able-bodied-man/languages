@@ -28,6 +28,14 @@ VOWELS = [
     ("ㅞ", "we"), ("ㅟ", "wi"), ("ㅠ", "yu"), ("ㅡ", "eu"), ("ㅢ", "ui"),
     ("ㅣ", "i"),
 ]
+# Teaching order used by the app's "Original" button: the ten plain vowels first
+# (ㅏ ㅑ ㅓ ㅕ ㅗ ㅛ ㅜ ㅠ ㅡ ㅣ), then the derived ones (ㅐ ㅒ ㅔ ㅖ ㅘ ㅙ ㅚ ㅝ ㅞ ㅟ ㅢ).
+# Syllables are sorted by initial consonant, then by this order.
+VOWEL_ORDER = [
+    "ㅏ", "ㅑ", "ㅓ", "ㅕ", "ㅗ", "ㅛ", "ㅜ", "ㅠ", "ㅡ", "ㅣ",
+    "ㅐ", "ㅒ", "ㅔ", "ㅖ", "ㅘ", "ㅙ", "ㅚ", "ㅝ", "ㅞ", "ㅟ", "ㅢ",
+]
+assert sorted(VOWEL_ORDER) == sorted(v for v, _ in VOWELS), "VOWEL_ORDER out of sync with VOWELS"
 # letter names, spoken for the jamo deck
 JAMO_NAMES = {
     "ㄱ": ("기역", "giyeok"), "ㄲ": ("쌍기역", "ssanggiyeok"), "ㄴ": ("니은", "nieun"),
@@ -79,6 +87,7 @@ def build_data():
             "voice": "ko-KR-SunHiNeural",
             "initials": len(INITIALS),
             "vowels": len(VOWELS),
+            "vowelOrder": VOWEL_ORDER,
         },
         "groups": [{"ini": ini, "rom": rom} for ini, rom in INITIALS],
         "vowels": [{"vow": v, "rom": r} for v, r in VOWELS],
