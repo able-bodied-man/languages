@@ -13,6 +13,9 @@
     viewBtn: $('viewBtn'), romBtn: $('romBtn'), shuffleBtn: $('shuffleBtn'),
     orderBtn: $('orderBtn'), resetBtn: $('resetBtn'),
   };
+  /* A cached page can be older than app.js (GitHub Pages caches HTML for 10 min),
+     so a control may be missing: never let that throw and kill the boot. */
+  const mark = (btn, on) => { if (btn) btn.classList.toggle('on', on); };
 
   const LS = 'hangul-flash-v1';
   const load = () => { try { return JSON.parse(localStorage.getItem(LS)) || {}; } catch { return {}; } };
@@ -36,7 +39,9 @@
         deck: state.deck, showRom: state.showRom, orderMode: state.orderMode,
         seen: [...state.seen], ratings: state.ratings,
       }));
-    } catch {}
+    } catch (err) {
+      if (window.console) console.warn('hangul-flash: progress not saved — storage blocked?', err);
+    }
   };
 
   const cardsFor = (deck) => deck === 'jamo' ? D.jamo : D.syllables;
@@ -93,7 +98,11 @@
      then the derived ones (ㅐ ㅒ ㅔ ㅖ ㅘ ㅙ ㅚ ㅝ ㅞ ㅟ ㅢ) — 가 갸 거 겨 고 교 구 규 그 기 개 걔 게 계 …
      Jamo keep the alphabet's own order: ㄱㄲㄴㄷ… then ㅏㅐㅑ… */
   const vowelRank = {};
-  ((D.meta && D.meta.vowelOrder) || []).forEach((v, i) => { vowelRank[v] = i; });
+  const DEFAULT_VOWEL_ORDER = [
+    'ㅏ', 'ㅑ', 'ㅓ', 'ㅕ', 'ㅗ', 'ㅛ', 'ㅜ', 'ㅠ', 'ㅡ', 'ㅣ',
+    'ㅐ', 'ㅒ', 'ㅔ', 'ㅖ', 'ㅘ', 'ㅙ', 'ㅚ', 'ㅝ', 'ㅞ', 'ㅟ', 'ㅢ',
+  ];
+  ((D.meta && D.meta.vowelOrder) || DEFAULT_VOWEL_ORDER).forEach((v, i) => { vowelRank[v] = i; });
   const vRank = (c) => (vowelRank[c.vow] != null ? vowelRank[c.vow] : 99);
 
   const orderedCache = {};
@@ -118,14 +127,19 @@
       [state.order[i], state.order[j]] = [state.order[j], state.order[i]];
     }
     state.pos = 0;
+    // a shuffle that happens to come out sorted would look like "it never shuffled"
+    const sorted = orderedCards();
+    if (state.order.length > 1 && state.order.every((c, i) => c === sorted[i])) {
+      state.order.push(state.order.shift());
+    }
   }
 
   function setOrder(mode) {
     state.orderMode = mode === 'original' ? 'original' : 'shuffle';
     buildOrder();
     if (state.orderMode === 'shuffle') shuffleOrder();
-    el.shuffleBtn.classList.toggle('on', state.orderMode === 'shuffle');
-    el.orderBtn.classList.toggle('on', state.orderMode === 'original');
+    mark(el.shuffleBtn, state.orderMode === 'shuffle');
+    mark(el.orderBtn, state.orderMode === 'original');
     persist();
     render();
   }
@@ -302,8 +316,8 @@
     });
   });
 
-  el.shuffleBtn.addEventListener('click', () => setOrder('shuffle'));
-  el.orderBtn.addEventListener('click', () => setOrder('original'));
+  if (el.shuffleBtn) el.shuffleBtn.addEventListener('click', () => setOrder('shuffle'));
+  if (el.orderBtn) el.orderBtn.addEventListener('click', () => setOrder('original'));
   el.viewBtn.addEventListener('click', () => setView(state.view === 'grid' ? 'card' : 'grid'));
   el.romBtn.addEventListener('click', () => {
     state.showRom = !state.showRom;
@@ -353,11 +367,19 @@
 
   /* ---------- boot ---------- */
   document.querySelectorAll('.deck-switch button').forEach(b => b.classList.toggle('on', b.dataset.deck === state.deck));
-  el.romBtn.classList.toggle('on', state.showRom);
+  mark(el.romBtn, state.showRom);
   setOrder(state.orderMode);        // default: shuffled
   updateProgress();
   resetDrag();
   const warm = new Audio();
   warm.preload = 'auto';
   warm.src = 'audio/' + state.order[0].k + '.mp3';
+
+  /* Restoring the page from the back/forward cache does not re-run this script,
+     so the old card would stay on screen. Re-deal it to match a real reload. */
+  window.addEventListener('pageshow', (e) => {
+    if (!e.persisted) return;
+    setOrder(state.orderMode);
+    updateProgress();
+  });
 })();
